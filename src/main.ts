@@ -1,114 +1,425 @@
-import {
-	Editor,
-	MarkdownView,
-	MarkdownFileInfo,
-	Modal,
-	Notice,
-	Plugin,
-} from 'obsidian';
-import {
-	DEFAULT_SETTINGS,
-	MyPluginSettings,
-	SampleSettingTab,
-} from './settings';
+import { ItemView, Plugin, TFile, WorkspaceLeaf, setIcon } from 'obsidian';
 
-// Remember to rename these classes and interfaces!
+const VIEW_TYPE = 'quest-journal-view';
 
-export default class MyPlugin extends Plugin {
-	settings!: MyPluginSettings;
+type QuestType = 'main' | 'side';
+type QuestStatus = 'selected' | 'available' | 'paused' | 'completed';
+type JournalTab = 'all' | 'main' | 'side' | 'selected';
 
-	async onload() {
-		await this.loadSettings();
+interface Objective {
+	text: string;
+	completed: boolean;
+	depth: number;
+	children: Objective[];
+}
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (_evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
+interface Quest {
+	file: TFile;
+	title: string;
+	type: QuestType;
+	status: QuestStatus;
+	description: string;
+	objectives: Objective[];
+	deadline?: string;
+	notes: string;
+}
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
+interface QuestTag {
+	id: string;
+	name: string;
+	color: string;
+}
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			},
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (
-				editor: Editor,
-				_ctx: MarkdownView | MarkdownFileInfo,
-			) => {
-				editor.replaceSelection('Sample editor command');
-			},
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView =
-					this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
+class QuestJournalView extends ItemView {
+	private quests: Quest[] = [];
+	private activeTab: JournalTab = 'all';
+	private selectedPath: string | null = null;
+	private showingDetail = false;
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
+	constructor(
+		leaf: WorkspaceLeaf,
+		private plugin: QuestJournalPlugin,
+	) {
+		super(leaf);
+	}
+
+	getViewType(): string {
+		return VIEW_TYPE;
+	}
+
+	getDisplayText(): string {
+		return 'Quest Journal';
+	}
+
+	getIcon(): string {
+		return 'book-open';
+	}
+
+	async onOpen(): Promise<void> {
+		await this.refresh();
+	}
+
+	async refresh(): Promise<void> {
+		this.quests = await this.loadQuests();
+
+		if (
+			!this.quests.some((quest) => quest.file.path === this.selectedPath)
+		) {
+			this.selectedPath = this.quests[0]?.file.path ?? null;
+		}
+
+		this.render();
+	}
+
+	private async loadQuests(): Promise<Quest[]> {
+		const files = this.app.vault
+			.getMarkdownFiles()
+			.filter((file) => file.path.startsWith('Quests/'));
+
+		return Promise.all(files.map((file) => this.parseQuest(file)));
+	}
+
+	private async parseQuest(file: TFile): Promise<Quest> {
+		const content = await this.app.vault.cachedRead(file);
+		const metadata =
+			this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+
+		const type: QuestType =
+			metadata.quest_type === 'side' ? 'side' : 'main';
+
+		const validStatuses: QuestStatus[] = [
+			'selected',
+			'available',
+			'paused',
+			'completed',
+		];
+
+		const status: QuestStatus = validStatuses.includes(
+			metadata.quest_status,
+		)
+			? metadata.quest_status
+			: 'available';
+
+		const sections = this.extractSections(content);
+
+		const objectiveText = sections.get('objectives') ?? '';
+		const objectives = this.parseObjectives(objectiveText);
+
+		return {
+			file,
+			title: file.basename,
+			type,
+			status,
+			description: sections.get('description')?.trim() ?? '',
+			objectives,
+			deadline: metadata.deadline ? String(metadata.deadline) : undefined,
+			notes: sections.get('notes')?.trim() ?? '',
+		};
+	}
+
+	private parseObjectives(objectiveText: string): Objective[] {
+		const roots: Objective[] = [];
+		const stack: Objective[] = [];
+
+		for (const line of objectiveText.split('\n')) {
+			const match = line.match(/^(\s*)[-*]\s+\[([ xX])\]\s+(.+)$/);
+
+			if (!match) continue;
+
+			const indentation = (match[1] ?? '').replace(/\t/g, '    ').length;
+
+			const objective: Objective = {
+				text: (match[3] ?? '').trim(),
+				completed: (match[2] ?? '').toLowerCase() === 'x',
+				depth: indentation,
+				children: [],
+			};
+
+			while (
+				stack.length > 0
+			) {
+				const last = stack[stack.length - 1];
+
+				if (!last || last.depth < objective.depth) break;
+
+				stack.pop();
+			}
+
+			const parent = stack[stack.length - 1];
+
+			if (parent) {
+				parent.children.push(objective);
+			} else {
+				roots.push(objective);
+			}
+
+			stack.push(objective);
+		}
+
+		return roots;
+	}
+
+	private extractSections(content: string): Map<string, string> {
+		const sections = new Map<string, string>();
+		let current: string | null = null;
+		let lines: string[] = [];
+
+		const save = () => {
+			if (current) sections.set(current, lines.join('\n').trim());
+		};
+
+		for (const line of content.split('\n')) {
+			const heading = line.match(/^##\s+(.+)$/);
+
+			if (heading) {
+				save();
+				current =
+					heading[1] === undefined
+						? ''
+						: heading[1].trim().toLowerCase();
+				lines = [];
+			} else if (current) {
+				lines.push(line);
+			}
+		}
+
+		save();
+		return sections;
+	}
+
+	private getVisibleQuests(): Quest[] {
+		return this.quests
+			.filter((quest) => {
+				if (this.activeTab === 'all') return true;
+				if (this.activeTab === 'selected') {
+					return quest.status === 'selected';
 				}
-				return false;
-			},
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(activeDocument, 'click', (_evt: MouseEvent) => {
-			new Notice('Click');
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(
-			window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000),
-		);
+				return quest.type === this.activeTab;
+			})
+			.sort((a, b) => {
+				if (a.status === 'selected' && b.status !== 'selected') {
+					return -1;
+				}
+				if (b.status === 'selected' && a.status !== 'selected') {
+					return 1;
+				}
+				return a.title.localeCompare(b.title);
+			});
 	}
 
-	onunload() {}
+	private render(): void {
+		const root = this.contentEl;
+		root.empty();
+		root.addClass('quest-journal');
 
-	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<MyPluginSettings>,
+		const header = root.createDiv({ cls: 'quest-header' });
+		header.createEl('h2', { text: 'Quest Journal' });
+
+		const refreshButton = header.createEl('button', {
+			cls: 'clickable-icon',
+			attr: { 'aria-label': 'Refresh quests' },
+		});
+		setIcon(refreshButton, 'refresh-cw');
+		refreshButton.addEventListener('click', () => {
+			void this.refresh();
+		});
+
+		const tabs = root.createDiv({ cls: 'quest-tabs' });
+
+		const tabNames: { id: JournalTab; label: string }[] = [
+			{ id: 'all', label: 'All' },
+			{ id: 'main', label: 'Main' },
+			{ id: 'side', label: 'Side' },
+			{ id: 'selected', label: 'Selected' },
+		];
+
+		for (const tab of tabNames) {
+			const button = tabs.createEl('button', {
+				text: tab.label,
+				cls: this.activeTab === tab.id ? 'is-active' : '',
+			});
+
+			button.addEventListener('click', () => {
+				this.activeTab = tab.id;
+				this.showingDetail = false;
+				this.render();
+			});
+		}
+
+		const layout = root.createDiv({
+			cls: 'quest-layout' + (this.showingDetail ? ' show-detail' : ''),
+		});
+
+		const list = layout.createDiv({ cls: 'quest-list' });
+		const detail = layout.createDiv({ cls: 'quest-detail' });
+
+		const visible = this.getVisibleQuests();
+
+		for (const type of ['main', 'side'] as QuestType[]) {
+			const group = visible.filter((quest) => quest.type === type);
+			if (group.length === 0) continue;
+
+			list.createEl('h4', {
+				text: `${type === 'main' ? 'Main' : 'Side'} Quests (${group.length})`,
+			});
+
+			for (const quest of group) {
+				const row = list.createDiv({
+					cls:
+						'quest-list-item' +
+						(quest.file.path === this.selectedPath
+							? ' is-selected'
+							: ''),
+				});
+
+				const icon = row.createSpan({ cls: 'quest-status-icon' });
+				const iconNames: Record<QuestStatus, string> = {
+					selected: 'bookmark-check',
+					available: 'circle',
+					paused: 'pause-circle',
+					completed: 'check-circle-2',
+				};
+				setIcon(icon, iconNames[quest.status]);
+
+				const label = row.createDiv({ cls: 'quest-list-label' });
+				label.createDiv({ text: quest.title });
+
+				const completed = quest.objectives.filter(
+					(objective) => objective.completed,
+				).length;
+
+				label.createEl('small', {
+					text: `${completed}/${quest.objectives.length} objectives`,
+				});
+
+				row.addEventListener('click', () => {
+					this.selectedPath = quest.file.path;
+					this.showingDetail = true;
+					this.render();
+				});
+			}
+		}
+
+		const selected = visible.find(
+			(quest) => quest.file.path === this.selectedPath,
 		);
-	}
 
-	async saveSettings() {
-		await this.saveData(this.settings);
+		if (!selected) {
+			detail.createEl('p', {
+				text: 'Select a quest to view its details.',
+				cls: 'quest-muted',
+			});
+			return;
+		}
+
+		const back = detail.createEl('button', {
+			text: '← Back to quests',
+			cls: 'quest-back',
+		});
+		back.addEventListener('click', () => {
+			this.showingDetail = false;
+			this.render();
+		});
+
+		detail.createEl('h2', { text: selected.title });
+
+		const status = detail.createDiv({ cls: 'quest-detail-status' });
+		status.setText(`Status: ${selected.status}`);
+
+		if (selected.deadline) {
+			detail.createEl('p', {
+				text: `Deadline: ${selected.deadline}`,
+				cls: 'quest-muted',
+			});
+		}
+
+		detail.createEl('h3', { text: 'Description' });
+		detail.createEl('p', {
+			text: selected.description || 'No description.',
+		});
+
+		detail.createEl('h3', { text: 'Objectives' });
+
+		if (selected.objectives.length === 0) {
+			detail.createEl('p', {
+				text: 'No objectives.',
+				cls: 'quest-muted',
+			});
+		}
+
+		for (const objective of selected.objectives) {
+			const row = detail.createDiv({ cls: 'quest-objective' });
+			row.style.paddingLeft = `${objective.depth * 4}px`;
+
+			const checkbox = row.createEl('input', {
+				type: 'checkbox',
+			});
+			checkbox.checked = objective.completed;
+			checkbox.disabled = true;
+
+			row.createSpan({ text: objective.text });
+		}
+
+		if (selected.notes) {
+			detail.createEl('h3', { text: 'Notes' });
+			detail.createEl('p', { text: selected.notes });
+		}
+
+		const openNote = detail.createEl('button', {
+			text: 'Open source note',
+		});
+
+		openNote.addEventListener('click', () => {
+			void this.app.workspace.getLeaf('tab').openFile(selected.file);
+		});
 	}
 }
 
-class SampleModal extends Modal {
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.setText('Woah!');
+export default class QuestJournalPlugin extends Plugin {
+	async onload(): Promise<void> {
+		this.registerView(
+			VIEW_TYPE,
+			(leaf) => new QuestJournalView(leaf, this),
+		);
+
+		this.addRibbonIcon('book-open', 'Open Quest Journal', () => {
+			void this.activateView();
+		});
+
+		this.addCommand({
+			id: 'open-quest-journal',
+			name: 'Open Quest Journal',
+			callback: () => void this.activateView(),
+		});
+
+		this.registerEvent(
+			this.app.vault.on('modify', (file) => {
+				if (file instanceof TFile && file.path.startsWith('Quests/')) {
+					void this.refreshViews();
+				}
+			}),
+		);
 	}
 
-	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
+	private async refreshViews(): Promise<void> {
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE);
+
+		for (const leaf of leaves) {
+			await (leaf.view as QuestJournalView).refresh();
+		}
+	}
+
+	private async activateView(): Promise<void> {
+		const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE);
+		const leaf = existing[0] ?? this.app.workspace.getLeaf('tab');
+
+		if (!existing.length) {
+			await leaf.setViewState({
+				type: VIEW_TYPE,
+				active: true,
+			});
+		}
+
+		await this.app.workspace.revealLeaf(leaf);
 	}
 }

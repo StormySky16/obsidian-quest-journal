@@ -1,8 +1,160 @@
-/*
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.quest-journal {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+}
 
-If your plugin does not need CSS, delete this file.
+.quest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+}
 
-*/
+.quest-header h2 {
+  margin: 0;
+}
+
+.quest-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.quest-tabs button {
+  flex: 1;
+  min-width: 0;
+}
+
+.quest-tabs button.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.quest-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 35%) minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+.quest-list {
+  overflow-y: auto;
+  border-right: 1px solid var(--background-modifier-border);
+  padding: 12px;
+}
+
+.quest-list h4 {
+  margin: 16px 8px 8px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 0.75em;
+}
+
+.quest-list-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+
+.quest-list-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.quest-list-item.is-selected {
+  background: var(--background-secondary);
+}
+
+.quest-status-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.quest-list-label {
+  min-width: 0;
+}
+
+.quest-list-label small {
+  display: block;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.quest-detail {
+  padding: 20px;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.quest-detail h2 {
+  margin-top: 0;
+}
+
+.quest-detail h3 {
+  margin-top: 24px;
+}
+
+.quest-detail-status {
+  color: var(--text-accent);
+  text-transform: capitalize;
+}
+
+.quest-objective {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.quest-objective input {
+  margin-top: 3px;
+}
+
+.quest-muted {
+  color: var(--text-muted);
+}
+
+.quest-back {
+  display: none;
+  margin-bottom: 16px;
+}
+
+@container (max-width: 600px) {
+  .quest-layout {
+    display: block;
+    position: relative;
+  }
+
+  .quest-list,
+  .quest-detail {
+    height: 100%;
+    border: none;
+  }
+
+  .quest-detail {
+    display: none;
+  }
+
+  .quest-layout.show-detail .quest-list {
+    display: none;
+  }
+
+  .quest-layout.show-detail .quest-detail {
+    display: block;
+  }
+
+  .quest-back {
+    display: inline-block;
+  }
+
+  .quest-tabs {
+    padding: 8px;
+    gap: 4px;
+  }
+}
