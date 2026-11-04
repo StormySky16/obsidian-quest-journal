@@ -105,11 +105,24 @@
   text-transform: capitalize;
 }
 
+.quest-objective-item {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
 .quest-objective {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin: 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.quest-objective-children {
+    display: flex;
+    flex-direction: column;
+    margin-left: 20px;
+    padding-left: 12px;
+    border-left: 1px solid var(--background-modifier-border);
 }
 
 .quest-objective input {
@@ -158,3 +171,4 @@
     gap: 4px;
   }
 }
+

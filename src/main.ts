@@ -178,6 +178,33 @@ class QuestJournalView extends ItemView {
 		return { completed, total };
 	}
 
+	private renderObjectives(
+		container: HTMLElement,
+		objectives: Objective[],
+	): void {
+		for (const objective of objectives) {
+			const item = container.createDiv({ cls: 'quest-objective-item' });
+
+			const row = item.createDiv({ cls: 'quest-objective' });
+
+			const checkbox = row.createEl('input', {
+				type: 'checkbox',
+			});
+
+			checkbox.checked = objective.completed;
+			checkbox.disabled = true;
+
+			row.createSpan({ text: objective.text });
+
+			if (objective.children.length > 0) {
+				const childContainer = item.createDiv({
+					cls: 'quest-objective-children',
+				});
+				this.renderObjectives(childContainer, objective.children);
+			}
+		}
+	}
+
 	private extractSections(content: string): Map<string, string> {
 		const sections = new Map<string, string>();
 		let current: string | null = null;
@@ -364,18 +391,8 @@ class QuestJournalView extends ItemView {
 			});
 		}
 
-		for (const objective of selected.objectives) {
-			const row = detail.createDiv({ cls: 'quest-objective' });
-			row.style.paddingLeft = `${objective.depth * 4}px`;
-
-			const checkbox = row.createEl('input', {
-				type: 'checkbox',
-			});
-			checkbox.checked = objective.completed;
-			checkbox.disabled = true;
-
-			row.createSpan({ text: objective.text });
-		}
+		// Render objectives
+		this.renderObjectives(detail, selected.objectives);
 
 		if (selected.notes) {
 			detail.createEl('h3', { text: 'Notes' });
