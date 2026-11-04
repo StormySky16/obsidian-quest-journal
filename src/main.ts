@@ -187,6 +187,9 @@ class QuestJournalView extends ItemView {
 
 			const row = item.createDiv({ cls: 'quest-objective' });
 
+			const hasChildren = objective.children.length > 0;
+
+			let toggleButton: HTMLButtonElement | null = null;
 			const checkbox = row.createEl('input', {
 				type: 'checkbox',
 			});
@@ -195,12 +198,49 @@ class QuestJournalView extends ItemView {
 			checkbox.disabled = true;
 
 			row.createSpan({ text: objective.text });
+			
+			if (hasChildren) {
+				toggleButton = row.createEl('button', {
+					cls: 'quest-objective-toggle clickable-icon',
+					attr: {
+						'aria-label': 'Toggle subobjectives',
+						'aria-expanded': String(!objective.completed),
+					},
+				});
 
-			if (objective.children.length > 0) {
+				setIcon(
+					toggleButton,
+					objective.completed ? 'chevron-right' : 'chevron-down',
+				);
+			} else {
+				row.createSpan({ cls: 'quest-objective-spacer' });
+			}
+
+			if (hasChildren) {
 				const childContainer = item.createDiv({
 					cls: 'quest-objective-children',
 				});
 				this.renderObjectives(childContainer, objective.children);
+
+				let expanded = !objective.completed;
+				childContainer.hidden = !expanded;
+
+				if (toggleButton) {
+					toggleButton?.addEventListener('click', () => {
+						expanded = !expanded;
+						childContainer.hidden = !expanded;
+
+						setIcon(
+							toggleButton!,
+							expanded ? 'chevron-down' : 'chevron-right',
+						);
+
+						toggleButton!.setAttr(
+							'aria-expanded',
+							String(expanded),
+						);
+					});
+				}
 			}
 		}
 	}
