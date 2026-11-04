@@ -7,6 +7,7 @@ type QuestStatus = 'selected' | 'available' | 'paused' | 'completed';
 type JournalTab = 'all' | 'main' | 'side' | 'selected';
 
 interface Objective {
+	id?: string;
 	text: string;
 	completed: boolean;
 	depth: number;
@@ -121,6 +122,8 @@ class QuestJournalView extends ItemView {
 		const roots: Objective[] = [];
 		const stack: Objective[] = [];
 
+		const idPattern = /\s+<!--\s*qj:id=([a-zA-Z0-9-]+)\s*-->\s*$/;
+
 		for (const line of objectiveText.split('\n')) {
 			const match = line.match(/^(\s*)[-*]\s+\[([ xX])\]\s+(.+)$/);
 
@@ -128,12 +131,18 @@ class QuestJournalView extends ItemView {
 
 			const indentation = (match[1] ?? '').replace(/\t/g, '    ').length;
 
+			const rawText = (match[3] ?? '').trim();
+			const idMatch = rawText.match(idPattern);
+
 			const objective: Objective = {
-				text: (match[3] ?? '').trim(),
+				id: idMatch?.[1],
+				text: rawText.replace(idPattern, '').trim(),
 				completed: (match[2] ?? '').toLowerCase() === 'x',
 				depth: indentation,
 				children: [],
 			};
+
+			console.log(`Parsed objective: ${objective.text}, depth: ${objective.depth}, completed: ${objective.completed}, id: ${objective.id}`);
 
 			while (stack.length > 0) {
 				const last = stack[stack.length - 1];
@@ -198,7 +207,7 @@ class QuestJournalView extends ItemView {
 			checkbox.disabled = true;
 
 			row.createSpan({ text: objective.text });
-			
+
 			if (hasChildren) {
 				toggleButton = row.createEl('button', {
 					cls: 'quest-objective-toggle clickable-icon',
@@ -243,6 +252,10 @@ class QuestJournalView extends ItemView {
 				}
 			}
 		}
+	}
+
+	private generateObjectiveId(): string {
+		return crypto.randomUUID();
 	}
 
 	private extractSections(content: string): Map<string, string> {
