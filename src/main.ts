@@ -135,9 +135,7 @@ class QuestJournalView extends ItemView {
 				children: [],
 			};
 
-			while (
-				stack.length > 0
-			) {
+			while (stack.length > 0) {
 				const last = stack[stack.length - 1];
 
 				if (!last || last.depth < objective.depth) break;
@@ -157,6 +155,27 @@ class QuestJournalView extends ItemView {
 		}
 
 		return roots;
+	}
+
+	private countObjectives(objectives: Objective[]): {
+		completed: number;
+		total: number;
+	} {
+		let completed = 0;
+		let total = 0;
+
+		for (const objective of objectives) {
+			total++;
+
+			if (objective.completed) completed++;
+
+			const childCounts = this.countObjectives(objective.children);
+
+			completed += childCounts.completed;
+			total += childCounts.total;
+		}
+
+		return { completed, total };
 	}
 
 	private extractSections(content: string): Map<string, string> {
@@ -284,12 +303,10 @@ class QuestJournalView extends ItemView {
 				const label = row.createDiv({ cls: 'quest-list-label' });
 				label.createDiv({ text: quest.title });
 
-				const completed = quest.objectives.filter(
-					(objective) => objective.completed,
-				).length;
+				const counts = this.countObjectives(quest.objectives);
 
 				label.createEl('small', {
-					text: `${completed}/${quest.objectives.length} objectives`,
+					text: `${counts.completed}/${counts.total} objectives`,
 				});
 
 				row.addEventListener('click', () => {
