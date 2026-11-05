@@ -129,18 +129,16 @@
   margin-top: 3px;
 }
 
+.quest-objective input[type="checkbox"] {
+    flex-shrink: 0;
+}
+
 .quest-objective-toggle {
     flex-shrink: 0;
     width: 20px;
     height: 20px;
     padding: 2px;
     margin: 0;
-}
-
-.quest-objective-toggle-spacer {
-    flex-shrink: 0;
-    width: 20px;
-    height: 20px;
 }
 
 .quest-objective-children[hidden] {
