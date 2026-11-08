@@ -19,7 +19,7 @@ export function parseQuest(file: TFile, content: string, metadata: FrontMatterCa
 	const sections = extractSections(content);
 
 	const objectiveText = sections.get('objectives') ?? '';
-	const objectives = parseObjectives(objectiveText);
+	const {objectives} = parseObjectives(objectiveText);
 
 	return {
 		file,

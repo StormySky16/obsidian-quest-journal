@@ -1,12 +1,19 @@
 import { Objective } from "../models/objective"
+import { ObjectiveParseIssue } from "../models/objective-parse-issue"
 
-export function parseObjectives(objectiveText: string): Objective[] {
+export interface ObjectiveParseResult {
+	objectives: Objective[];
+	issues: ObjectiveParseIssue[];
+}
+
+export function parseObjectives(objectiveText: string): ObjectiveParseResult {
         const roots: Objective[] = [];
         const stack: Objective[] = [];
+		const issues: ObjectiveParseIssue[] = [];
 
         const idPattern = /\s+<!--\s*qj:id=([a-zA-Z0-9-]+)\s*-->\s*$/;
 
-        for (const line of objectiveText.split('\n')) {
+        for (const [index, line] of objectiveText.split('\n').entries()) {
             const match = line.match(/^(\s*)[-*]\s+\[([ xX])\]\s+(.+)$/);
 
             if (!match) continue;
@@ -15,6 +22,18 @@ export function parseObjectives(objectiveText: string): Objective[] {
 
             const rawText = (match[3] ?? '').trim();
             const idMatch = rawText.match(idPattern);
+
+			const malformedIdPattern = /<!--\s*qj:id\s*=\s*(.*?)\s*-->/g;
+
+			for (const malformedMatch of rawText.matchAll(malformedIdPattern)) {
+				if (idMatch && malformedMatch[0] === idMatch[0].trim()) continue;
+
+				issues.push({
+					type: 'malformed-id',
+					line: index + 1,
+					rawId: malformedMatch[1] ?? '',
+				})
+			}
 
             const objective: Objective = {
                 id: idMatch?.[1],
@@ -43,5 +62,8 @@ export function parseObjectives(objectiveText: string): Objective[] {
             stack.push(objective);
         }
 
-        return roots;
+        return {
+			objectives: roots,
+			issues,
+		};
     }
