@@ -1,5 +1,6 @@
 import { TFile } from 'obsidian';
 import { Objective } from './objective';
+import { ObjectiveParseIssue } from './objective-parse-issue';
 
 export type QuestType = 'main' | 'side';
 export type QuestStatus = 'selected' | 'available' | 'paused' | 'completed';
@@ -13,6 +14,7 @@ export interface Quest {
     objectives: Objective[];
     deadline?: string;
     notes: string;
+	objectiveParseIssues?: ObjectiveParseIssue[];
 }
 
 export interface QuestTag {

@@ -19,7 +19,7 @@ export function parseQuest(file: TFile, content: string, metadata: FrontMatterCa
 	const sections = extractSections(content);
 
 	const objectiveText = sections.get('objectives') ?? '';
-	const {objectives} = parseObjectives(objectiveText);
+	const {objectives, issues} = parseObjectives(objectiveText);
 
 	return {
 		file,
@@ -28,6 +28,7 @@ export function parseQuest(file: TFile, content: string, metadata: FrontMatterCa
 		status,
 		description: sections.get('description')?.trim() ?? '',
 		objectives,
+		objectiveParseIssues: issues,
 		deadline: metadata.deadline ? String(metadata.deadline) : undefined,
 		notes: sections.get('notes')?.trim() ?? '',
 	};
