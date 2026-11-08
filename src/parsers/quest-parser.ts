@@ -2,7 +2,16 @@ import { TFile, FrontMatterCache } from 'obsidian';
 import { Quest, QuestType, QuestStatus } from '../models/quest';
 import { parseObjectives } from './objective-parser';
 
-export function parseQuest(file: TFile, content: string, metadata: FrontMatterCache): Quest {
+interface MarkdownSection {
+	content: string;
+	startLine: number;
+}
+
+export function parseQuest(
+	file: TFile,
+	content: string,
+	metadata: FrontMatterCache,
+): Quest {
 	const type: QuestType = metadata.quest_type === 'side' ? 'side' : 'main';
 
 	const validStatuses: QuestStatus[] = [
@@ -18,32 +27,34 @@ export function parseQuest(file: TFile, content: string, metadata: FrontMatterCa
 
 	const sections = extractSections(content);
 
-	const objectiveText = sections.get('objectives') ?? '';
-	const {objectives, issues} = parseObjectives(objectiveText);
+	const objectiveText = sections.get('objectives')?.content ?? '';
+	const { objectives, issues } = parseObjectives(objectiveText);
 
 	return {
 		file,
 		title: file.basename,
 		type,
 		status,
-		description: sections.get('description')?.trim() ?? '',
+		description: sections.get('description')?.content.trim() ?? '',
 		objectives,
 		objectiveParseIssues: issues,
 		deadline: metadata.deadline ? String(metadata.deadline) : undefined,
-		notes: sections.get('notes')?.trim() ?? '',
+		notes: sections.get('notes')?.content.trim() ?? '',
 	};
 }
 
-function extractSections(content: string): Map<string, string> {
-	const sections = new Map<string, string>();
+export function extractSections(content: string): Map<string, MarkdownSection> {
+	const sections = new Map<string, MarkdownSection>();
 	let current: string | null = null;
 	let lines: string[] = [];
+	let startLine = 0;
 
 	const save = () => {
-		if (current) sections.set(current, lines.join('\n').trim());
+		if (current !== null)
+			sections.set(current, { content: lines.join('\n'), startLine });
 	};
 
-	for (const line of content.split('\n')) {
+	for (const [index, line] of content.split('\n').entries()) {
 		const heading = line.match(/^##\s+(.+)$/);
 
 		if (heading) {
@@ -51,6 +62,7 @@ function extractSections(content: string): Map<string, string> {
 			current =
 				heading[1] === undefined ? '' : heading[1].trim().toLowerCase();
 			lines = [];
+			startLine = index + 2; // +2 to account for 1-based line number and the heading line itself
 		} else if (current) {
 			lines.push(line);
 		}
