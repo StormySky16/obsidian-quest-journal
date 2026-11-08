@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { parseObjectives } from '../src/parsers/objective-parser';
-import { migrateObjectiveIds } from '../src/engine/objective-migration';
 
 // export interface Objective {
 // 	id?: string;
@@ -100,5 +99,15 @@ describe('parseObjectives', () => {
 		);
 
 		expect(result.issues).toEqual([]);
+	});
+
+	it('parses objectives with CRLF line endings', () => {
+		const markdown = ['- [ ] First', '- [x] Second'].join('\r\n');
+
+		const result = parseObjectives(markdown);
+
+		expect(result.objectives).toHaveLength(2);
+		expect(result.objectives[1]?.completed).toBe(true);
+		expect(result.objectives[1]?.sourceLine).toBe(2);
 	});
 });

@@ -42,4 +42,26 @@ describe('extractSections', () => {
 			startLine: 2,
 		});
 	});
+
+	it('extracts sections from CRLF content', () => {
+		const markdown = [
+			'# Example quest',
+			'## Objectives',
+			'- [ ] First',
+			'- [x] Second',
+			'## Notes',
+			'Keep this unchanged.',
+		].join('\r\n');
+
+		const sections = extractSections(markdown);
+
+		expect(sections.get('objectives')).toEqual({
+			content: '- [ ] First\n- [x] Second',
+			startLine: 3,
+		});
+		expect(sections.get('notes')).toEqual({
+			content: 'Keep this unchanged.',
+			startLine: 6,
+		});
+	});
 });

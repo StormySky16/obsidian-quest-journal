@@ -72,7 +72,7 @@ export function extractSections(content: string): Map<string, MarkdownSection> {
 			sections.set(current, { content: lines.join('\n'), startLine });
 	};
 
-	for (const [index, line] of content.split('\n').entries()) {
+	for (const [index, line] of content.split(/\r?\n/).entries()) {
 		const heading = line.match(/^##\s+(.+)$/);
 
 		if (heading) {

@@ -11,7 +11,8 @@ export interface ObjectiveMigrationResult {
 }
 
 function matchesObjectiveSource(line: string, objective: Objective): boolean {
-	const match = line.match(/^(\s*)[-*]\s+\[([ xX])\]\s+(.+)$/);
+	const source = line.endsWith('\r') ? line.slice(0, -1) : line;
+	const match = source.match(/^(\s*)[-*]\s+\[([ xX])\]\s+(.+)$/);
 
 	if (!match) {
 		return false;
@@ -25,6 +26,23 @@ function matchesObjectiveSource(line: string, objective: Objective): boolean {
 		indentation === objective.depth &&
 		completed === objective.completed &&
 		text === objective.text
+	);
+}
+
+function appendObjectiveId(line: string, id: string): string {
+	const hasCarriageReturn = line.endsWith('\r');
+
+	const content = hasCarriageReturn ? line.slice(0, -1) : line;
+
+	const match = content.match(/([ \t]*)$/);
+	const trailingWhitespace = match?.[1] ?? '';
+
+	const body = content.slice(0, content.length - trailingWhitespace.length);
+
+	return (
+		`${body} <!-- qj:id=${id} -->` +
+		trailingWhitespace +
+		(hasCarriageReturn ? '\r' : '')
 	);
 }
 
@@ -72,7 +90,7 @@ export function migrateObjectiveIds(
 		for (let attempt = 0; attempt < MAX_ID_ATTEMPTS; attempt++) {
 			const id = generateId();
 
-			if (!VALID_ID_PATTERN.test(id)){
+			if (!VALID_ID_PATTERN.test(id)) {
 				continue;
 			}
 
@@ -114,7 +132,7 @@ export function migrateObjectiveIds(
 					return;
 				}
 
-				lines[index] = `${line} <!-- qj:id=${id} -->`;
+				lines[index] = appendObjectiveId(line, id);
 				changed = true;
 			}
 
@@ -124,7 +142,6 @@ export function migrateObjectiveIds(
 
 	visit(quest.objectives);
 
-	
 	if (errors.length > 0) {
 		return {
 			content,

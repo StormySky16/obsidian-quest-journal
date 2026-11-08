@@ -60,5 +60,24 @@ describe('parseQuest', () => {
 				rawId: 'abc_123',
 			},
 		]);
-	})
-})
+	});
+
+	it('parses objectives and absolute source lines from CRLF content', () => {
+		const file = {
+			basename: 'Test Quest',
+		} as TFile;
+		const content = [
+			'# Test Quest',
+			'## Objectives',
+			'- [ ] First',
+			'- [x] Second',
+		].join('\r\n');
+
+		const quest = parseQuest(file, content, {});
+
+		expect(quest.objectives).toHaveLength(2);
+		expect(quest.objectives[0]?.sourceLine).toBe(3);
+		expect(quest.objectives[1]?.sourceLine).toBe(4);
+	});
+
+});

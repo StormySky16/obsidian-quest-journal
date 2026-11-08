@@ -22,7 +22,7 @@ describe('migrateObjectiveIds', () => {
 			/- \[ \] First objective <!-- qj:id=[a-f0-9-]+ -->/,
 		);
 		expect(result.content).toMatch(
-			/    - \[x\] Nested objective <!-- qj:id=[a-f0-9-]+ -->/,
+			/ {4}- \[x\] Nested objective <!-- qj:id=[a-f0-9-]+ -->/,
 		);
 	});
 
@@ -82,7 +82,7 @@ describe('migrateObjectiveIds', () => {
 			/- \[x\] Completed objective <!-- qj:id=[a-f0-9-]+ -->/,
 		);
 		expect(result.content).toMatch(
-			/    - \[ \] Incomplete child <!-- qj:id=[a-f0-9-]+ -->/,
+			/ {4}- \[ \] Incomplete child <!-- qj:id=[a-f0-9-]+ -->/,
 		);
 	});
 
@@ -181,4 +181,70 @@ describe('migrateObjectiveIds', () => {
 			'Unable to generate a unique objective ID at line 2.',
 		);
 	});
+
+	it('preserves CRLF line endings during migration', () => {
+		const content = [
+			'# Example Quest',
+			'## Objectives',
+			'- [ ] First',
+			'- [x] Second',
+			'## Notes',
+			'Keep this unchanged.',
+		].join('\r\n');
+
+		const ids = ['first-id', 'second-id'];
+		let index = 0;
+
+		const result = migrateObjectiveIds(file, content, () => ids[index++]!);
+
+		expect(result.errors).toEqual([]);
+		expect(result.changed).toBe(true);
+
+		expect(result.content).toContain(
+			'- [ ] First <!-- qj:id=first-id -->\r\n',
+		);
+
+		expect(result.content).toContain(
+			'- [x] Second <!-- qj:id=second-id -->\r\n',
+		);
+
+		expect(result.content).toContain('## Notes\r\nKeep this unchanged.');
+
+		// Every newline should still be CRLF.
+		expect(result.content.replace(/\r\n/g, '')).not.toContain('\n');
+	});
+
+	it('preserves trailing spaces when inserting an ID', () => {
+		const content = ['## Objectives', '- [ ] Task   '].join('\n');
+
+		const result = migrateObjectiveIds(file, content, () => 'test-id');
+
+		expect(result.errors).toEqual([]);
+		expect(result.content).toBe(
+			'## Objectives\n- [ ] Task <!-- qj:id=test-id -->   ',
+		);
+	});
+
+	it('preserves unrelated Markdown content', () => {
+		const content = [
+			'# Example Quest',
+			'',
+			'## Description',
+			'Some **formatted** text.',
+			'',
+			'## Objectives',
+			'- [ ] Task',
+			'',
+			'## Notes',
+			'> An important note.',
+		].join('\n');
+
+		const result = migrateObjectiveIds(file, content, () => 'test-id');
+
+		expect(result.errors).toEqual([]);
+		expect(result.content).toBe(
+			content.replace('- [ ] Task', '- [ ] Task <!-- qj:id=test-id -->'),
+		);
+	});
+
 });
