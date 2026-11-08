@@ -18,7 +18,7 @@ describe('parseQuest', () => {
 		expect(quest.objectiveParseIssues).toEqual([
 			{
 				type: 'malformed-id',
-				line: 1,
+				line: 2,
 				rawId: 'abc_123',
 			},
 		]);
@@ -36,5 +36,29 @@ describe('parseQuest', () => {
 
 		const quest = parseQuest(file, content, {});
 		expect(quest.objectiveParseIssues).toEqual([]);
+	})
+
+	it('converts parsing issue lines to absolute file lines', () => {
+		const file = {
+			basename: 'Test Quest',
+		} as TFile;
+
+		const content = [
+			'## Description',
+			'A test quest.',
+			'',
+			'## Objectives',
+			'- [ ] Invalid <!-- qj:id=abc_123 -->',
+		].join('\n');
+
+		const quest = parseQuest(file, content, {});
+
+		expect(quest.objectiveParseIssues).toEqual([
+			{
+				type: 'malformed-id',
+				line: 5,
+				rawId: 'abc_123',
+			},
+		]);
 	})
 })

@@ -1,4 +1,5 @@
 import { TFile, FrontMatterCache } from 'obsidian';
+import { Objective } from '../models/objective';
 import { Quest, QuestType, QuestStatus } from '../models/quest';
 import { parseObjectives } from './objective-parser';
 
@@ -27,8 +28,25 @@ export function parseQuest(
 
 	const sections = extractSections(content);
 
-	const objectiveText = sections.get('objectives')?.content ?? '';
-	const { objectives, issues } = parseObjectives(objectiveText);
+	const objectiveSection= sections.get('objectives');
+	const { objectives, issues } = parseObjectives(objectiveSection?.content ?? '');
+
+	if (objectiveSection) {
+		const offset = objectiveSection.startLine - 1;
+
+		const applyOffset = (nodes: Objective[]): void => {
+			for (const objective of nodes) {
+				objective.sourceLine += offset;
+				applyOffset(objective.children);
+			}
+		}
+
+		applyOffset(objectives);
+
+		for (const issue of issues) {
+			issue.line += offset;
+		}
+	}
 
 	return {
 		file,
