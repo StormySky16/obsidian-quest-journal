@@ -12,6 +12,7 @@ function makeObjective(
 		completed: false,
 		depth: 0,
 		children,
+		sourceLine: 1,
 	};
 }
 

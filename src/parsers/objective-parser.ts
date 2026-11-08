@@ -41,6 +41,7 @@ export function parseObjectives(objectiveText: string): ObjectiveParseResult {
                 completed: (match[2] ?? '').toLowerCase() === 'x',
                 depth: indentation,
                 children: [],
+				sourceLine: index + 1,
             };
 
             while (stack.length > 0) {

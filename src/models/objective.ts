@@ -4,4 +4,5 @@ export interface Objective {
     completed: boolean;
     depth: number;
     children: Objective[];
+	sourceLine: number;
 }
