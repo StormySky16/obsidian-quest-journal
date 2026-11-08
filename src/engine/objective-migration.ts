@@ -66,10 +66,15 @@ export function migrateObjectiveIds(
 	collectIds(quest.objectives);
 
 	const MAX_ID_ATTEMPTS = 10;
+	const VALID_ID_PATTERN = /^[a-zA-Z0-9-]+$/;
 
 	const generateUniqueId = (): string | null => {
 		for (let attempt = 0; attempt < MAX_ID_ATTEMPTS; attempt++) {
 			const id = generateId();
+
+			if (!VALID_ID_PATTERN.test(id)){
+				continue;
+			}
 
 			if (!usedIds.has(id)) {
 				usedIds.add(id);

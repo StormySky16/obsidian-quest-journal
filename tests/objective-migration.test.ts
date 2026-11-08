@@ -153,4 +153,32 @@ describe('migrateObjectiveIds', () => {
 			'Unable to generate a unique objective ID at line 3.',
 		);
 	});
+
+	it('retries when a generated ID has an invalid format', () => {
+		const content = ['## Objectives', '- [ ] Missing ID'].join('\n');
+
+		const ids = ['invalid_id', '', 'valid-id'];
+		let index = 0;
+
+		const result = migrateObjectiveIds(file, content, () => ids[index++]!);
+
+		expect(result.errors).toEqual([]);
+		expect(result.changed).toBe(true);
+		expect(result.content).toContain(
+			'- [ ] Missing ID <!-- qj:id=valid-id -->',
+		);
+		expect(index).toBe(3);
+	});
+
+	it('rejects migration when all generated IDs are invalid', () => {
+		const content = ['## Objectives', '- [ ] Missing ID'].join('\n');
+
+		const result = migrateObjectiveIds(file, content, () => 'invalid_id');
+
+		expect(result.changed).toBe(false);
+		expect(result.content).toBe(content);
+		expect(result.errors).toContain(
+			'Unable to generate a unique objective ID at line 2.',
+		);
+	});
 });
