@@ -2,11 +2,30 @@ import type { TFile } from 'obsidian';
 import { parseQuest } from '../parsers/quest-parser';
 import { validateObjectiveIds } from './objective-validation';
 import { generateObjectiveId } from '../utils/ids';
+import { Objective } from '../models/objective';
 
 export interface ObjectiveMigrationResult {
 	content: string;
 	changed: boolean;
 	errors: string[];
+}
+
+function matchesObjectiveSource(line: string, objective: Objective): boolean {
+	const match = line.match(/^(\s*)[-*]\s+\[([ xX])\]\s+(.+)$/);
+
+	if (!match) {
+		return false;
+	}
+
+	const indentation = (match[1] ?? '').replace(/\t/g, '    ').length;
+	const completed = (match[2] ?? '').toLowerCase() === 'x';
+	const text = (match[3] ?? '').trim();
+
+	return (
+		indentation === objective.depth &&
+		completed === objective.completed &&
+		text === objective.text
+	);
 }
 
 export function migrateObjectiveIds(
@@ -48,6 +67,13 @@ export function migrateObjectiveIds(
 				if (line === undefined) {
 					errors.push(
 						`Objective source line ${objective.sourceLine} not found.`,
+					);
+					return;
+				}
+
+				if (!matchesObjectiveSource(line, objective)) {
+					errors.push(
+						`Objective source mismatch at line ${objective.sourceLine}.`,
 					);
 					return;
 				}

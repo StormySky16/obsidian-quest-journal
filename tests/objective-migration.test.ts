@@ -66,4 +66,23 @@ describe('migrateObjectiveIds', () => {
 		expect(result.errors.length).toBeGreaterThan(0);
 		expect(result.content).toBe(content);
 	});
+
+	it('preserves objective text and completion status when adding IDs', () => {
+		const content = [
+			'## Objectives',
+			'- [x] Completed objective',
+			'    - [ ] Incomplete child',
+		].join('\n');
+
+		const result = migrateObjectiveIds(file, content);
+
+		expect(result.changed).toBe(true);
+		expect(result.errors).toEqual([]);
+		expect(result.content).toMatch(
+			/- \[x\] Completed objective <!-- qj:id=[a-f0-9-]+ -->/,
+		);
+		expect(result.content).toMatch(
+			/    - \[ \] Incomplete child <!-- qj:id=[a-f0-9-]+ -->/,
+		);
+	});
 });
