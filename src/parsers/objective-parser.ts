@@ -35,6 +35,19 @@ export function parseObjectives(objectiveText: string): ObjectiveParseResult {
 				})
 			}
 
+			const idMarkerPattern = /<!--\s*qj:id\b/gi;
+			const completeIdCommentPattern = /<!--\s*qj:id\s*=\s*.*?-->/gi;
+
+			const remainingText = rawText.replace(completeIdCommentPattern, '');
+
+			for (const marker of remainingText.matchAll(idMarkerPattern)) {
+				issues.push({
+					type: 'malformed-id',
+					line: index + 1,
+					rawId: '',
+				})
+			}
+
             const objective: Objective = {
                 id: idMatch?.[1],
                 text: rawText.replace(idPattern, '').trim(),

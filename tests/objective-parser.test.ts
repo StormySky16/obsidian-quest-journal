@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseObjectives } from '../src/parsers/objective-parser';
+import { migrateObjectiveIds } from '../src/engine/objective-migration';
 
 // export interface Objective {
 // 	id?: string;
@@ -64,5 +65,40 @@ describe('parseObjectives', () => {
 
 		expect(objectives[0]?.sourceLine).toBe(1);
 		expect(objectives[0]?.children[0]?.sourceLine).toBe(3);
+	});
+
+	it('reports an unterminated objective ID comment', () => {
+		const result = parseObjectives('- [ ] Update resume <!-- qj:id=abc123');
+
+		expect(result.issues).toEqual([
+			{
+				type: 'malformed-id',
+				line: 1,
+				rawId: '',
+			},
+		]);
+	});
+
+	it('reports an incomplete objective ID marker', () => {
+		const result = parseObjectives('- [ ] Update resume <!-- qj:id');
+
+		expect(result.issues).toHaveLength(1);
+		expect(result.issues[0]?.type).toBe('malformed-id');
+	});
+
+	it('does not report ordinary HTML comments', () => {
+		const result = parseObjectives(
+			'- [ ] Update resume <!-- Personal reminder -->',
+		);
+
+		expect(result.issues).toEqual([]);
+	});
+
+	it('does not report valid objective ID comments', () => {
+		const result = parseObjectives(
+			'- [ ] Update resume <!-- qj:id=abc123 -->',
+		);
+
+		expect(result.issues).toEqual([]);
 	});
 });

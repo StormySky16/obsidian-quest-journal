@@ -85,4 +85,18 @@ describe('migrateObjectiveIds', () => {
 			/    - \[ \] Incomplete child <!-- qj:id=[a-f0-9-]+ -->/,
 		);
 	});
+
+	it('refuses migration when an ID comment is incomplete', () => {
+		const content = [
+			'## Objectives',
+			'- [ ] Incomplete <!-- qj:id=abc123',
+			'- [ ] Missing ID',
+		].join('\n');
+
+		const result = migrateObjectiveIds(file, content);
+
+		expect(result.changed).toBe(false);
+		expect(result.content).toBe(content);
+		expect(result.errors.length).toBeGreaterThan(0);
+	});
 });
