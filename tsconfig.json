@@ -15,5 +15,5 @@
 		"allowSyntheticDefaultImports": true,
 		"lib": ["ES2021", "DOM"]
 	},
-	"include": ["src/**/*.ts", "src/main.ts"]
+	"include": ["src/**/*.ts", "tests/**/*.ts"]
 }

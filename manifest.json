@@ -2,7 +2,7 @@
 	"id": "quest-journal",
 	"name": "Quest Journal",
 	"version": "0.1.0",
-	"minAppVersion": "1.5.0",
+	"minAppVersion": "1.7.2",
 	"description": "A quest-based personal objective management system.",
 	"author": "StormySky16",
 	"isDesktopOnly": false

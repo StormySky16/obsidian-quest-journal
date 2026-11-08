@@ -8,13 +8,13 @@ export default class QuestJournalPlugin extends Plugin {
 			(leaf) => new QuestJournalView(leaf, this),
 		);
 
-		this.addRibbonIcon('book-open', 'Open Quest Journal', () => {
+		this.addRibbonIcon('book-open', 'Open quest journal', () => {
 			void this.activateView();
 		});
 
 		this.addCommand({
 			id: 'open-quest-journal',
-			name: 'Open Quest Journal',
+			name: 'Open journal',
 			callback: () => void this.activateView(),
 		});
 

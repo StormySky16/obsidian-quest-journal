@@ -29,4 +29,17 @@ export default defineConfig(
 		},
 	},
 	...obsidianmd.configs.recommended,
+	{
+		files: ['src/main.ts'],
+		rules: {
+			// The existing command ID is retained for installation compatibility.
+			'obsidianmd/commands/no-plugin-id-in-command-id': 'off',
+		},
+	},
+	{
+		files: ['tests/**/*.ts'],
+		rules: {
+			'obsidianmd/no-tfile-tfolder-cast': 'off',
+		},
+	},
 );
