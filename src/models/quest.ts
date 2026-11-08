@@ -14,7 +14,7 @@ export interface Quest {
     objectives: Objective[];
     deadline?: string;
     notes: string;
-	objectiveParseIssues?: ObjectiveParseIssue[];
+	objectiveParseIssues: ObjectiveParseIssue[];
 }
 
 export interface QuestTag {
