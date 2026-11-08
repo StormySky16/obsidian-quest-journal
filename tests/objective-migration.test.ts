@@ -99,4 +99,58 @@ describe('migrateObjectiveIds', () => {
 		expect(result.content).toBe(content);
 		expect(result.errors.length).toBeGreaterThan(0);
 	});
+
+	it('retries when a generated ID collides with an existing ID', () => {
+		const content = [
+			'## Objectives',
+			'- [ ] Existing <!-- qj:id=existing-id -->',
+			'- [ ] Missing',
+		].join('\n');
+
+		const ids = ['existing-id', 'new-id'];
+		let index = 0;
+
+		const result = migrateObjectiveIds(file, content, () => ids[index++]!);
+
+		expect(result.errors).toEqual([]);
+		expect(result.changed).toBe(true);
+		expect(result.content).toContain('- [ ] Missing <!-- qj:id=new-id -->');
+		expect(index).toBe(2);
+	});
+
+	it('prevents collisions between newly generated IDs', () => {
+		const content = ['## Objectives', '- [ ] First', '- [ ] Second'].join(
+			'\n',
+		);
+
+		const ids = ['shared-id', 'shared-id', 'unique-id'];
+		let index = 0;
+
+		const result = migrateObjectiveIds(file, content, () => ids[index++]!);
+
+		expect(result.errors).toEqual([]);
+		expect(result.content).toContain(
+			'- [ ] First <!-- qj:id=shared-id -->',
+		);
+		expect(result.content).toContain(
+			'- [ ] Second <!-- qj:id=unique-id -->',
+		);
+		expect(index).toBe(3);
+	});
+
+	it('rejects migration when a unique ID cannot be generated', () => {
+		const content = [
+			'## Objectives',
+			'- [ ] Existing <!-- qj:id=existing-id -->',
+			'- [ ] Missing',
+		].join('\n');
+
+		const result = migrateObjectiveIds(file, content, () => 'existing-id');
+
+		expect(result.changed).toBe(false);
+		expect(result.content).toBe(content);
+		expect(result.errors).toContain(
+			'Unable to generate a unique objective ID at line 3.',
+		);
+	});
 });

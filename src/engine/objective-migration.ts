@@ -31,6 +31,7 @@ function matchesObjectiveSource(line: string, objective: Objective): boolean {
 export function migrateObjectiveIds(
 	file: TFile,
 	content: string,
+	generateId: () => string = generateObjectiveId,
 ): ObjectiveMigrationResult {
 	const quest = parseQuest(file, content, {});
 	const validation = validateObjectiveIds(quest.objectives);
@@ -47,16 +48,37 @@ export function migrateObjectiveIds(
 		);
 	}
 
-	if (errors.length > 0) {
-		return {
-			content,
-			changed: false,
-			errors,
-		};
-	}
-
 	const lines = content.split('\n');
 	let changed = false;
+
+	const usedIds = new Set<string>();
+
+	const collectIds = (objectives: Objective[]): void => {
+		for (const objective of objectives) {
+			if (objective.id) {
+				usedIds.add(objective.id);
+			}
+
+			collectIds(objective.children);
+		}
+	};
+
+	collectIds(quest.objectives);
+
+	const MAX_ID_ATTEMPTS = 10;
+
+	const generateUniqueId = (): string | null => {
+		for (let attempt = 0; attempt < MAX_ID_ATTEMPTS; attempt++) {
+			const id = generateId();
+
+			if (!usedIds.has(id)) {
+				usedIds.add(id);
+				return id;
+			}
+		}
+
+		return null;
+	};
 
 	const visit = (objectives: typeof quest.objectives): void => {
 		for (const objective of objectives) {
@@ -78,9 +100,16 @@ export function migrateObjectiveIds(
 					return;
 				}
 
-				lines[index] =
-					`${line} <!-- qj:id=${generateObjectiveId()} -->`;
+				const id = generateUniqueId();
 
+				if (id === null) {
+					errors.push(
+						`Unable to generate a unique objective ID at line ${objective.sourceLine}.`,
+					);
+					return;
+				}
+
+				lines[index] = `${line} <!-- qj:id=${id} -->`;
 				changed = true;
 			}
 
@@ -89,6 +118,15 @@ export function migrateObjectiveIds(
 	};
 
 	visit(quest.objectives);
+
+	
+	if (errors.length > 0) {
+		return {
+			content,
+			changed: false,
+			errors,
+		};
+	}
 
 	return {
 		content: changed ? lines.join('\n') : content,
