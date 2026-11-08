@@ -1,10 +1,10 @@
-import { App, ItemView, WorkspaceLeaf, setIcon } from "obsidian";
-import { Quest, QuestType, QuestStatus } from "../models/quest";
-import { loadQuests } from "../services/quest-repository";
-import { Objective } from "../models/objective";
-import { countObjectives } from "../engine/objective-engine";
+import { App, ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
+import { Quest, QuestType, QuestStatus } from '../models/quest';
+import { loadQuests } from '../services/quest-repository';
+import { Objective } from '../models/objective';
+import { countObjectives } from '../engine/objective-engine';
 
-import QuestJournalPlugin from "../main";
+import QuestJournalPlugin from '../main';
 
 export const VIEW_TYPE = 'quest-journal-view';
 
@@ -28,7 +28,7 @@ export class QuestJournalView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return 'Quest Journal';
+		return 'Quest journal';
 	}
 
 	getIcon(): string {
@@ -126,15 +126,15 @@ export class QuestJournalView extends ItemView {
 			.filter((quest) => {
 				if (this.activeTab === 'all') return true;
 				if (this.activeTab === 'selected') {
-					return quest.status === 'selected';
+					return quest.selected;
 				}
 				return quest.type === this.activeTab;
 			})
 			.sort((a, b) => {
-				if (a.status === 'selected' && b.status !== 'selected') {
+				if (a.selected && !b.selected) {
 					return -1;
 				}
-				if (b.status === 'selected' && a.status !== 'selected') {
+				if (b.selected && !a.selected) {
 					return 1;
 				}
 				return a.title.localeCompare(b.title);
@@ -147,7 +147,7 @@ export class QuestJournalView extends ItemView {
 		root.addClass('quest-journal');
 
 		const header = root.createDiv({ cls: 'quest-header' });
-		header.createEl('h2', { text: 'Quest Journal' });
+		header.createEl('h2', { text: 'Quest journal' });
 
 		const refreshButton = header.createEl('button', {
 			cls: 'clickable-icon',
@@ -208,12 +208,14 @@ export class QuestJournalView extends ItemView {
 
 				const icon = row.createSpan({ cls: 'quest-status-icon' });
 				const iconNames: Record<QuestStatus, string> = {
-					selected: 'bookmark-check',
 					available: 'circle',
 					paused: 'pause-circle',
 					completed: 'check-circle-2',
 				};
-				setIcon(icon, iconNames[quest.status]);
+				setIcon(
+					icon,
+					quest.selected ? 'bookmark-check' : iconNames[quest.status],
+				);
 
 				const label = row.createDiv({ cls: 'quest-list-label' });
 				label.createDiv({ text: quest.title });
@@ -245,7 +247,7 @@ export class QuestJournalView extends ItemView {
 		}
 
 		const back = detail.createEl('button', {
-			text: '← Back to quests',
+			text: '← back to quests',
 			cls: 'quest-back',
 		});
 		back.addEventListener('click', () => {
@@ -256,7 +258,9 @@ export class QuestJournalView extends ItemView {
 		detail.createEl('h2', { text: selected.title });
 
 		const status = detail.createDiv({ cls: 'quest-detail-status' });
-		status.setText(`Status: ${selected.status}`);
+		status.setText(
+			`Status: ${selected.status}${selected.selected ? ' • Selected' : ''}`,
+		);
 
 		if (selected.deadline) {
 			detail.createEl('p', {

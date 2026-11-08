@@ -8,6 +8,10 @@ interface MarkdownSection {
 	startLine: number;
 }
 
+function isQuestStatus(value: unknown): value is QuestStatus {
+	return value === 'available' || value === 'paused' || value === 'completed';
+}
+
 export function parseQuest(
 	file: TFile,
 	content: string,
@@ -15,16 +19,12 @@ export function parseQuest(
 ): Quest {
 	const type: QuestType = metadata.quest_type === 'side' ? 'side' : 'main';
 
-	const validStatuses: QuestStatus[] = [
-		'selected',
-		'available',
-		'paused',
-		'completed',
-	];
-
-	const status: QuestStatus = validStatuses.includes(metadata.quest_status)
-		? metadata.quest_status
+	const rawStatus: unknown = metadata.quest_status;
+	const legacySelected = rawStatus === 'selected';
+	const status: QuestStatus = isQuestStatus(rawStatus)
+		? rawStatus
 		: 'available';
+	const selected = legacySelected || metadata.quest_selected === true;
 
 	const sections = extractSections(content);
 
@@ -53,6 +53,7 @@ export function parseQuest(
 		title: file.basename,
 		type,
 		status,
+		selected,
 		description: sections.get('description')?.content.trim() ?? '',
 		objectives,
 		objectiveParseIssues: issues,

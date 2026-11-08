@@ -80,4 +80,23 @@ describe('parseQuest', () => {
 		expect(quest.objectives[1]?.sourceLine).toBe(4);
 	});
 
+	it('keeps selection separate from lifecycle status', () => {
+		const file = {
+			basename: 'Test Quest',
+		} as TFile;
+
+		const selectedQuest = parseQuest(file, '', {
+			quest_status: 'paused',
+			quest_selected: true,
+		});
+		const legacyQuest = parseQuest(file, '', {
+			quest_status: 'selected',
+		});
+
+		expect(selectedQuest.status).toBe('paused');
+		expect(selectedQuest.selected).toBe(true);
+		expect(legacyQuest.status).toBe('available');
+		expect(legacyQuest.selected).toBe(true);
+	});
+
 });
