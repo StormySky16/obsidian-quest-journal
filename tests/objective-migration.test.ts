@@ -247,4 +247,27 @@ describe('migrateObjectiveIds', () => {
 		);
 	});
 
+	it('is idempotent when run twice', () => {
+		const content = [
+			'# Example Quest',
+			'## Objectives',
+			'- [ ] First',
+			'- [x] Second',
+		].join('\n');
+
+		const ids = ['first-id', 'second-id'];
+		let index = 0;
+
+		const first = migrateObjectiveIds(file, content, () => ids[index++]!);
+
+		expect(first.errors).toEqual([]);
+		expect(first.changed).toBe(true);
+
+		const second = migrateObjectiveIds(file, first.content, () => {
+			throw new Error('No new IDs should be generated');
+		});
+		expect(second.errors).toEqual([]);
+		expect(second.changed).toBe(false);
+		expect(second.content).toBe(first.content);
+	});
 });
