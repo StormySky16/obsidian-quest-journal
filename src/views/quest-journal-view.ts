@@ -56,6 +56,36 @@ export class QuestJournalView extends ItemView {
 		this.render();
 	}
 
+	private renderObjectiveText(container: HTMLElement, text: string): void {
+		const commentPattern = /<!--[\s\S]*?-->|<!--.*$/g;
+
+		let lastIndex = 0;
+
+		for (const match of text.matchAll(commentPattern)) {
+			const index = match.index;
+			const comment = match[0];
+
+			if (index > lastIndex) {
+				container.createSpan({ text: text.slice(lastIndex, index) });
+			}
+
+			const isMalformedId = /<!--\s*qj:id\b/i.test(comment);
+
+			container.createSpan({
+				cls: isMalformedId
+					? 'quest-objective-comment is-malformed'
+					: 'quest-objective-comment',
+				text: comment,
+			});
+
+			lastIndex = index + comment.length;
+		}
+
+		if (lastIndex < text.length) {
+			container.createSpan({ text: text.slice(lastIndex) });
+		}
+	}
+
 	private renderObjectives(
 		container: HTMLElement,
 		objectives: Objective[],
@@ -75,7 +105,7 @@ export class QuestJournalView extends ItemView {
 			checkbox.checked = objective.completed;
 			checkbox.disabled = true;
 
-			row.createSpan({ text: objective.text });
+			this.renderObjectiveText(row, objective.text);
 
 			if (hasChildren) {
 				toggleButton = row.createEl('button', {

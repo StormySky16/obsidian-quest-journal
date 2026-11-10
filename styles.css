@@ -145,6 +145,15 @@
     display: none;
 }
 
+.quest-objective-comment {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.quest-objective-comment.is-malformed {
+	color: var(--text-error);
+}
+
 .quest-muted {
   color: var(--text-muted);
 }
