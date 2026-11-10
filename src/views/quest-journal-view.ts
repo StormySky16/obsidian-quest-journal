@@ -3,6 +3,7 @@ import { Quest, QuestType, QuestStatus } from '../models/quest';
 import { loadQuests } from '../services/quest-repository';
 import { Objective } from '../models/objective';
 import { countObjectives } from '../engine/objective-engine';
+import { getQuestEditState } from '../engine/quest-edit-readiness';
 
 import QuestJournalPlugin from '../main';
 
@@ -35,9 +36,9 @@ export class QuestJournalView extends ItemView {
 		return 'book-open';
 	}
 
-    getApp(): App {
-        return this.app;
-    }
+	getApp(): App {
+		return this.app;
+	}
 
 	async onOpen(): Promise<void> {
 		await this.refresh();
@@ -89,7 +90,7 @@ export class QuestJournalView extends ItemView {
 					toggleButton,
 					objective.completed ? 'chevron-right' : 'chevron-down',
 				);
-			} 
+			}
 
 			if (hasChildren) {
 				const childContainer = item.createDiv({
@@ -101,7 +102,7 @@ export class QuestJournalView extends ItemView {
 				childContainer.hidden = !expanded;
 
 				if (toggleButton) {
-                    const button = toggleButton;
+					const button = toggleButton;
 					button.addEventListener('click', () => {
 						expanded = !expanded;
 						childContainer.hidden = !expanded;
@@ -111,10 +112,7 @@ export class QuestJournalView extends ItemView {
 							expanded ? 'chevron-down' : 'chevron-right',
 						);
 
-						button.setAttr(
-							'aria-expanded',
-							String(expanded),
-						);
+						button.setAttr('aria-expanded', String(expanded));
 					});
 				}
 			}
@@ -139,6 +137,32 @@ export class QuestJournalView extends ItemView {
 				}
 				return a.title.localeCompare(b.title);
 			});
+	}
+
+	private renderEditNotice(container: HTMLElement, quest: Quest): void {
+		const editState = getQuestEditState(quest);
+
+		if (editState === 'ready') {
+			return;
+		}
+
+		const notice = container.createDiv({ cls: 'quest-edit-notice' });
+
+		if (editState === 'migration-required') {
+			notice.createEl('strong', { text: 'One-time update required' });
+
+			notice.createEl('p', {
+				text: 'This quest needs objective identifiers before editing can be enabled. Your existing objectives and completion states will be preserved.',
+			});
+
+			return;
+		}
+
+		notice.createEl('strong', { text: 'Objective editing unavailable.' });
+
+		notice.createEl('p', {
+			text: 'This quest contains invalid or duplicate objective identifiers. Open the source note to resolve the issue before editing.',
+		});
 	}
 
 	private render(): void {
@@ -261,6 +285,8 @@ export class QuestJournalView extends ItemView {
 		status.setText(
 			`Status: ${selected.status}${selected.selected ? ' • Selected' : ''}`,
 		);
+
+		this.renderEditNotice(detail, selected);
 
 		if (selected.deadline) {
 			detail.createEl('p', {
