@@ -1,6 +1,9 @@
-import { App, ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
+import { App, ItemView, WorkspaceLeaf, setIcon, Notice } from 'obsidian';
 import { Quest, QuestType, QuestStatus } from '../models/quest';
-import { loadQuests } from '../services/quest-repository';
+import {
+	loadQuests,
+	migrateQuestObjectiveIds,
+} from '../services/quest-repository';
 import { Objective } from '../models/objective';
 import { countObjectives } from '../engine/objective-engine';
 import { getQuestEditState } from '../engine/quest-edit-readiness';
@@ -169,6 +172,39 @@ export class QuestJournalView extends ItemView {
 			});
 	}
 
+	private async approveObjectiveMigration(
+		quest: Quest,
+		button: HTMLButtonElement,
+	): Promise<void> {
+		button.disabled = true;
+		button.setText('Updating...');
+
+		try {
+			await migrateQuestObjectiveIds(this.app, quest.file);
+			await this.refresh();
+
+			new Notice('Quest objectives updated successfully.');
+		} catch (error) {
+			console.error('Quest Journal: Objective migration failed', error);
+
+			new Notice(
+				`Unable to update objective IDs. Check the console for details.`,
+			);
+
+			try {
+				await this.refresh();
+			} catch (refreshError) {
+				console.error(
+					'Quest Journal: Failed to refresh after migration error',
+					refreshError,
+				);
+
+				button.disabled = false;
+				button.setText('Update and enable editing');
+			}
+		}
+	}
+
 	private renderEditNotice(container: HTMLElement, quest: Quest): void {
 		const editState = getQuestEditState(quest);
 
@@ -185,6 +221,14 @@ export class QuestJournalView extends ItemView {
 				text: 'This quest needs objective identifiers before editing can be enabled. Your existing objectives and completion states will be preserved.',
 			});
 
+			const updateButton = notice.createEl('button', {
+				text: 'Update and enable editing',
+				cls: 'mod-cta',
+			});
+
+			updateButton.addEventListener('click', () => {
+				void this.approveObjectiveMigration(quest, updateButton);
+			});
 			return;
 		}
 
