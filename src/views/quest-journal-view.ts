@@ -3,6 +3,7 @@ import { Quest, QuestType, QuestStatus } from '../models/quest';
 import {
 	loadQuests,
 	migrateQuestObjectiveIds,
+	setQuestObjectiveCompletion,
 } from '../services/quest-repository';
 import { Objective } from '../models/objective';
 import { countObjectives } from '../engine/objective-engine';
@@ -92,6 +93,7 @@ export class QuestJournalView extends ItemView {
 	private renderObjectives(
 		container: HTMLElement,
 		objectives: Objective[],
+		quest: Quest,
 	): void {
 		for (const objective of objectives) {
 			const item = container.createDiv({ cls: 'quest-objective-item' });
@@ -104,9 +106,23 @@ export class QuestJournalView extends ItemView {
 			const checkbox = row.createEl('input', {
 				type: 'checkbox',
 			});
-
 			checkbox.checked = objective.completed;
-			checkbox.disabled = true;
+
+			const canEdit =
+				getQuestEditState(quest) === 'ready' &&
+				objective.id !== undefined;
+
+			checkbox.disabled = !canEdit;
+
+			if (canEdit) {
+				checkbox.addEventListener('change', () => {
+					void this.updateQuestObjectiveCompletion(
+						quest,
+						objective,
+						checkbox,
+					);
+				});
+			}
 
 			this.renderObjectiveText(row, objective.text);
 
@@ -129,7 +145,11 @@ export class QuestJournalView extends ItemView {
 				const childContainer = item.createDiv({
 					cls: 'quest-objective-children',
 				});
-				this.renderObjectives(childContainer, objective.children);
+				this.renderObjectives(
+					childContainer,
+					objective.children,
+					quest,
+				);
 
 				let expanded = !objective.completed;
 				childContainer.hidden = !expanded;
@@ -149,6 +169,36 @@ export class QuestJournalView extends ItemView {
 					});
 				}
 			}
+		}
+	}
+
+	private async updateQuestObjectiveCompletion(
+		quest: Quest,
+		objective: Objective,
+		checkbox: HTMLInputElement,
+	): Promise<void> {
+		if (!objective.id) return;
+
+		checkbox.disabled = true;
+
+		try {
+			await setQuestObjectiveCompletion(
+				this.app,
+				quest.file,
+				objective.id,
+				checkbox.checked,
+			);
+
+			await this.refresh();
+		} catch (error) {
+			console.error('Quest Journal: Objective completion failed', error);
+
+			new Notice(
+				'Unable to update objective completion. Check the console for details.',
+			);
+
+			checkbox.checked = objective.completed;
+			checkbox.disabled = false;
 		}
 	}
 
@@ -384,7 +434,7 @@ export class QuestJournalView extends ItemView {
 		}
 
 		// Render objectives
-		this.renderObjectives(detail, selected.objectives);
+		this.renderObjectives(detail, selected.objectives, selected);
 
 		if (selected.notes) {
 			detail.createEl('h3', { text: 'Notes' });
