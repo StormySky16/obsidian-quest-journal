@@ -5,9 +5,10 @@ main and side quests. It provides a two-pane journal, nested objective tracking,
 completion counts, status filters, and a selected-quest view without adding XP,
 streaks, or other active gamification.
 
-The current interface is read-only. Quest notes remain ordinary Markdown files,
-and objective ID migration is implemented as a tested, in-memory operation but
-is not yet connected to vault writes.
+The journal supports interactive objective checkboxes for quests with valid objective 
+IDs. Quests with missing objective IDs can be migrated directly from the journal to 
+enable editing. Quests containing malformed or duplicate objective IDs remain read-only 
+until the issues are manually resolved.
 
 ## Quest format
 
@@ -37,12 +38,18 @@ Quest content uses level-two sections and Markdown task lists:
 Prepare for the journey.
 
 ## Objectives
-- [ ] Gather supplies
-    - [x] Pack a map
+- [ ] Gather supplies <!-- qj:id=generated-UUID -->
+    - [x] Pack a map <!-- qj:id=generated-UUID -->
 
 ## Notes
 Optional supporting information.
 ```
+Objective IDs are generated automatically during migration. 
+The generated-UUID values above are placeholders for illustration.
+
+For detailed information about quest file structure, objective IDs,
+validation, migration, and completion semantics, see the
+[Markdown format specification](docs/markdown-format.md).
 
 ## Development
 
