@@ -1,3 +1,9 @@
+import type { TFile, FrontMatterCache } from 'obsidian';
+import type { Objective } from '../models/objective';
+import { parseQuest } from '../parsers/quest-parser';
+import { getQuestEditState } from './quest-edit-readiness';
+import { validateObjectiveIds } from './objective-validation';
+
 export interface ObjectiveCompletionResult {
 	content: string;
 	changed: boolean;
@@ -5,43 +11,71 @@ export interface ObjectiveCompletionResult {
 }
 
 export function setObjectiveCompletion(
+	file: TFile,
 	content: string,
+	metadata: FrontMatterCache,
 	objectiveId: string,
 	completed: boolean,
 ): ObjectiveCompletionResult {
-	const lines = content.split(/\r?\n/);
+	const quest = parseQuest(file, content, metadata);
+	const editState = getQuestEditState(quest);
 
-	const escapedId = objectiveId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	if (editState !== 'ready') {
+		const validation = validateObjectiveIds(quest.objectives);
 
-	const idPattern = new RegExp(`<!--\\s*qj:id=${escapedId}\\s*-->\\s*$`);
+		let error: string;
 
-	const matches: number[] = [];
-
-	for (let index = 0; index < lines.length; index++) {
-		const line = lines[index];
-
-		if (
-			line &&
-			/^(\s*)[-*]\s+\[([ xX])\]\s+/.test(line) &&
-			idPattern.test(line)
-		) {
-			matches.push(index);
+		if (quest.objectiveParseIssues.length > 0) {
+			error = 'Quest contains malformed objective IDs.';
+		} else if (validation.duplicates.length > 0) {
+			error = `Multiple objectives found with ID: ${validation.duplicates.join(', ')}`;
+		} else {
+			error = `${validation.missing} objectives are missing IDs.`;
 		}
-	}
 
-	if (matches.length !== 1) {
 		return {
 			content,
 			changed: false,
-			error:
-				matches.length === 0
-					? `Objective ID not found: ${objectiveId}`
-					: `Multiple objectives found with ID: ${objectiveId}`,
+			error,
 		};
 	}
 
-	const index = matches[0]!;
-	const originalLine = lines[index]!;
+	let target: Objective | undefined;
+
+	const findObjective = (nodes: Objective[]): void => {
+		for (const objective of nodes) {
+			if (objective.id === objectiveId) {
+				target = objective;
+				return;
+			}
+
+			findObjective(objective.children);
+
+			if (target) return;
+		}
+	};
+
+	findObjective(quest.objectives);
+
+	if (!target) {
+		return {
+			content,
+			changed: false,
+			error: `Objective ID not found: ${objectiveId}`,
+		};
+	}
+
+	const lines = content.split(/\r?\n/);
+	const lineIndex = target.sourceLine - 1;
+	const originalLine = lines[lineIndex];
+
+	if (!originalLine) {
+		return {
+			content,
+			changed: false,
+			error: `Objective source line not found: ${objectiveId}`,
+		};
+	}
 
 	const updatedLine = originalLine.replace(
 		/^(\s*[-*]\s+\[)[ xX](\])/,
@@ -55,7 +89,7 @@ export function setObjectiveCompletion(
 		};
 	}
 
-	lines[index] = updatedLine;
+	lines[lineIndex] = updatedLine;
 
 	return {
 		content: lines.join(content.includes('\r\n') ? '\r\n' : '\n'),
