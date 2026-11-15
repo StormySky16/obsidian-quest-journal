@@ -1,6 +1,8 @@
 # Quest Journal Markdown format
 
-> **Status:** Documents the implementation in the supplied November 2026 snapshot. Planned behavior is explicitly marked and is not yet implemented.
+> **Status:** Documents the current Quest Journal Markdown format
+> and implemented behavior. Future functionality is explicitly
+> identified as planned.
 
 Quest Journal stores quests as ordinary Markdown files. The file remains the source of truth; the journal parses and presents it. A person should be able to inspect and meaningfully edit the core quest content without the plugin.
 
@@ -86,17 +88,24 @@ The supported ID comment is a trailing comment of the form:
 | `migration-required` | Missing IDs, but no malformed IDs or duplicates | User may initiate ID migration before editing. |
 | `blocked` | Malformed IDs or duplicate IDs | Editing is blocked pending repair. |
 
-## 6. Current completion and persistence behavior
+## 6. Completion semantics
 
-**Implemented today:** `Objective.completed` is a boolean derived directly from its Markdown checkbox. Parent and child checkboxes are independent; no recursive completion is computed yet. `countObjectives()` counts every parsed objective, including parents and children, and counts only those whose stored checkbox is checked.
+Quest Journal distinguishes between **manual completion**, which is stored in Markdown, and **effective completion**, which is computed by the journal.
 
-When a user changes an editable objective checkbox, the repository uses Obsidian's `vault.process()` to re-read and modify the file. The completion engine reparses and validates the current content, finds the target by objective ID, and changes the checkbox on its recorded source line. It does not rewrite other objective lines or automatically change parents or descendants. The write can fail if validation or source targeting fails.
+### Manual completion
 
-**Line endings:** The parser accepts LF and CRLF. The completion writer splits on either and joins using CRLF if the content contains CRLF, otherwise LF; therefore mixed line endings are not guaranteed to be preserved exactly.
+The Markdown checkbox represents an objective's explicit completion state:
 
-## 7. Planned: hierarchical effective completion
+- `[ ]` — Not manually completed.
+- `[x]` or `[X]` — Manually completed.
 
-**Not yet implemented.** The agreed design keeps the Markdown checkbox as the **explicit/manual** completion state and derives the **effective** state recursively:
+This state is stored as `Objective.completed: boolean`.
+
+Checking or unchecking an objective manually changes only that objective's stored checkbox. Its parents and children are not modified.
+
+### Effective completion
+
+The journal computes an objective's effective completion recursively:
 
 ```text
 effectivelyComplete(objective) =
@@ -107,21 +116,65 @@ effectivelyComplete(objective) =
     )
 ```
 
-Consequences:
+Consequently:
 
-- A parent with all descendants effectively complete can appear automatically complete even if its own Markdown checkbox is `[ ]`.
-- Explicitly completing a parent does **not** change its children.
-- Reopening a child removes automatic completion from ancestors unless an ancestor is explicitly complete or still qualifies through its children.
-- Leaf objectives are complete only when explicitly checked.
-- Planned journal progress counts will use effective completion, while stored checkboxes continue to represent manual intent.
-- Planned UI will visually distinguish explicit/manual completion from computed/automatic completion.
-- An explicit *force-incomplete* override when all children are complete is **not supported** by this model. An additional checkbox marker is a possible future extension, not part of the current syntax.
+- A leaf objective is effectively complete only when manually completed.
+- A parent becomes automatically complete when all its children are effectively complete.
+- Automatic completion propagates through multiple levels of nesting.
+- Manually completing a parent does not complete its descendants.
+- Reopening a child removes automatic completion from affected ancestors unless those ancestors remain manually complete or otherwise satisfy the recursive completion rule.
+- Effective completion is derived from the current objective tree and is not persisted separately.
 
-Quest-level `quest_status: completed` remains a separate, explicitly managed status; objective completion does not automatically change it.
+### Journal representation
+
+The journal displays checkboxes according to effective completion rather than stored manual completion alone.
+
+Manual and automatic completion are visually distinguished:
+
+- Manually completed objectives use the standard checked appearance.
+- Automatically completed objectives use a distinct checked appearance.
+- Incomplete objectives remain unchecked.
+
+An automatically completed parent can be clicked to mark it manually complete. Unchecking a manually completed parent removes its explicit completion, after which its effective state is recalculated from its children.
+
+This means a parent whose Markdown checkbox is `[ ]` may appear checked in Quest Journal when all its children are complete.
+
+### Objective counting
+
+`countObjectives()` recursively counts every objective, including parents and descendants.
+
+An objective contributes to the completed count when it is **effectively complete**, whether manually or automatically.
+
+Each objective is counted independently. Manually completing a parent does not cause its incomplete descendants to count as complete.
+
+### Known limitation
+
+The current model does not support explicitly forcing a parent to remain incomplete when all its children are effectively complete.
+
+A future custom checkbox marker could represent this override without requiring automatic completion to be persisted. No such marker is currently implemented.
+
+Quest-level `quest_status: completed` remains independent of objective completion. Completing all objectives does not automatically change the quest's status.
+
+## 7. Objective editing and persistence
+
+When a user changes an editable objective checkbox, the repository uses Obsidian's `vault.process()` to read and modify the current file content.
+
+The completion engine:
+
+1. Reparses and validates the current quest content.
+2. Locates the targeted objective using its stable objective ID.
+3. Updates the checkbox on its recorded source line.
+4. Preserves unrelated objective lines and descendant completion states.
+
+The write is rejected if validation or source targeting fails.
+
+Only explicit/manual completion is written to Markdown. Automatic completion is recalculated when the objective tree is evaluated.
+
+**Line endings:** The parser accepts LF and CRLF. The completion writer splits on either and joins using CRLF if the content contains CRLF, otherwise LF. Mixed line endings are therefore not guaranteed to be preserved exactly.
 
 ## 8. Compatibility and known limitations
 
-- Markdown remains the authoritative editable representation; some computed journal states may differ visually from raw checkbox markers once hierarchical completion is implemented.
+- Markdown remains the authoritative editable representation. Automatically completed objectives may appear checked in the journal while remaining unchecked in the underlying Markdown because effective completion is computed rather than persisted.
 - Custom checkbox markers are not supported by the current parser. Adding them requires coordinated changes to parsing, validation, migration, editing, rendering, and tests.
 - The parser does not enforce a formal Markdown grammar; it recognizes the specific heading and checkbox patterns described above.
 - Duplicate `## Objectives` headings are not merged and should be avoided.

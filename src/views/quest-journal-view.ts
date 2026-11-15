@@ -6,7 +6,10 @@ import {
 	setQuestObjectiveCompletion,
 } from '../services/quest-repository';
 import { Objective } from '../models/objective';
-import { countObjectives } from '../engine/objective-engine';
+import {
+	countObjectives,
+	isEffectivelyCompleted,
+} from '../engine/objective-engine';
 import { getQuestEditState } from '../engine/quest-edit-readiness';
 
 import QuestJournalPlugin from '../main';
@@ -106,20 +109,30 @@ export class QuestJournalView extends ItemView {
 			const checkbox = row.createEl('input', {
 				type: 'checkbox',
 			});
-			checkbox.checked = objective.completed;
 
 			const canEdit =
 				getQuestEditState(quest) === 'ready' &&
 				objective.id !== undefined;
 
+			const automaticallyCompleted =
+				!objective.completed && isEffectivelyCompleted(objective);
+
 			checkbox.disabled = !canEdit;
+			checkbox.checked = isEffectivelyCompleted(objective);
+
+			checkbox.toggleClass(
+				'quest-objective-auto-completed',
+				automaticallyCompleted,
+			);
 
 			if (canEdit) {
 				checkbox.addEventListener('change', () => {
+					const manuallyCompleted = automaticallyCompleted ? true : checkbox.checked;
 					void this.updateQuestObjectiveCompletion(
 						quest,
 						objective,
 						checkbox,
+						manuallyCompleted,
 					);
 				});
 			}
@@ -176,6 +189,7 @@ export class QuestJournalView extends ItemView {
 		quest: Quest,
 		objective: Objective,
 		checkbox: HTMLInputElement,
+		manuallyCompleted: boolean,
 	): Promise<void> {
 		if (!objective.id) return;
 
@@ -186,7 +200,7 @@ export class QuestJournalView extends ItemView {
 				this.app,
 				quest.file,
 				objective.id,
-				checkbox.checked,
+				manuallyCompleted,
 			);
 
 			await this.refresh();
@@ -197,7 +211,7 @@ export class QuestJournalView extends ItemView {
 				'Unable to update objective completion. Check the console for details.',
 			);
 
-			checkbox.checked = objective.completed;
+			checkbox.checked = isEffectivelyCompleted(objective);
 			checkbox.disabled = false;
 		}
 	}

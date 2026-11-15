@@ -1,22 +1,34 @@
 import { Objective } from '../models/objective';
 
 export function countObjectives(objectives: Objective[]): {
-        completed: number;
-        total: number;
-    } {
-        let completed = 0;
-        let total = 0;
+	completed: number;
+	total: number;
+} {
+	let completed = 0;
+	let total = 0;
 
-        for (const objective of objectives) {
-            total++;
+	for (const objective of objectives) {
+		total++;
 
-            if (objective.completed) completed++;
+		if (isEffectivelyCompleted(objective)) completed++;
 
-            const childCounts = countObjectives(objective.children);
+		const childCounts = countObjectives(objective.children);
 
-            completed += childCounts.completed;
-            total += childCounts.total;
-        }
+		completed += childCounts.completed;
+		total += childCounts.total;
+	}
 
-        return { completed, total };
-    }
+	return { completed, total };
+}
+
+export function isEffectivelyCompleted(objective: Objective): boolean {
+	if (objective.completed) {
+		return true;
+	}
+
+	if (objective.children.length === 0) {
+		return false;
+	}
+
+	return objective.children.every(isEffectivelyCompleted);
+}
