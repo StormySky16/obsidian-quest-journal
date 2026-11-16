@@ -53,6 +53,7 @@ export class QuestJournalView extends ItemView {
 	}
 
 	async refresh(): Promise<void> {
+		console.debug('Quest Journal: refresh', performance.now());
 		this.quests = await loadQuests(this.app);
 
 		if (
@@ -213,8 +214,6 @@ export class QuestJournalView extends ItemView {
 				objective.id,
 				manuallyCompleted,
 			);
-
-			await this.refresh();
 		} catch (error) {
 			console.error('Quest Journal: Objective completion failed', error);
 
