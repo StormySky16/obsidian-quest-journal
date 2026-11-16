@@ -23,6 +23,7 @@ export class QuestJournalView extends ItemView {
 	private activeTab: JournalTab = 'all';
 	private selectedPath: string | null = null;
 	private showingDetail = false;
+	private objectiveExpansionOverrides = new Map<string, boolean>();
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -105,7 +106,6 @@ export class QuestJournalView extends ItemView {
 
 			const hasChildren = objective.children.length > 0;
 
-			let toggleButton: HTMLButtonElement | null = null;
 			const checkbox = row.createEl('input', {
 				type: 'checkbox',
 			});
@@ -127,7 +127,9 @@ export class QuestJournalView extends ItemView {
 
 			if (canEdit) {
 				checkbox.addEventListener('change', () => {
-					const manuallyCompleted = automaticallyCompleted ? true : checkbox.checked;
+					const manuallyCompleted = automaticallyCompleted
+						? true
+						: checkbox.checked;
 					void this.updateQuestObjectiveCompletion(
 						quest,
 						objective,
@@ -140,47 +142,56 @@ export class QuestJournalView extends ItemView {
 			this.renderObjectiveText(row, objective.text);
 
 			if (hasChildren) {
-				toggleButton = row.createEl('button', {
+				let expanded =
+					(objective.id !== undefined
+						? this.objectiveExpansionOverrides.get(objective.id)
+						: undefined) ?? !isEffectivelyCompleted(objective);
+
+				const toggleButton = row.createEl('button', {
 					cls: 'quest-objective-toggle clickable-icon',
 					attr: {
 						'aria-label': 'Toggle subobjectives',
-						'aria-expanded': String(!objective.completed),
+						'aria-expanded': String(expanded),
 					},
 				});
 
 				setIcon(
 					toggleButton,
-					objective.completed ? 'chevron-right' : 'chevron-down',
+					expanded ? 'chevron-down' : 'chevron-right',
 				);
-			}
 
-			if (hasChildren) {
 				const childContainer = item.createDiv({
 					cls: 'quest-objective-children',
 				});
+
 				this.renderObjectives(
 					childContainer,
 					objective.children,
 					quest,
 				);
 
-				let expanded = !objective.completed;
 				childContainer.hidden = !expanded;
 
-				if (toggleButton) {
-					const button = toggleButton;
-					button.addEventListener('click', () => {
-						expanded = !expanded;
-						childContainer.hidden = !expanded;
+				const button = toggleButton;
+				button.addEventListener('click', () => {
+					expanded = !expanded;
 
-						setIcon(
-							button,
-							expanded ? 'chevron-down' : 'chevron-right',
+					if (objective.id !== undefined) {
+						this.objectiveExpansionOverrides.set(
+							objective.id,
+							expanded,
 						);
+					}
 
-						button.setAttr('aria-expanded', String(expanded));
-					});
-				}
+					childContainer.hidden = !expanded;
+
+					setIcon(
+						button,
+						expanded ? 'chevron-down' : 'chevron-right',
+					);
+
+					button.setAttr('aria-expanded', String(expanded));
+				});
 			}
 		}
 	}
@@ -389,6 +400,13 @@ export class QuestJournalView extends ItemView {
 				});
 
 				row.addEventListener('click', () => {
+					if (
+						this.selectedPath !== quest.file.path ||
+						!this.showingDetail
+					) {
+						this.objectiveExpansionOverrides.clear();
+					}
+
 					this.selectedPath = quest.file.path;
 					this.showingDetail = true;
 					this.render();
@@ -413,6 +431,7 @@ export class QuestJournalView extends ItemView {
 			cls: 'quest-back',
 		});
 		back.addEventListener('click', () => {
+			this.objectiveExpansionOverrides.clear();
 			this.showingDetail = false;
 			this.render();
 		});
