@@ -1,5 +1,5 @@
 import { App, TFile } from 'obsidian';
-import { Quest } from '../models/quest';
+import { Quest, QuestStatus } from '../models/quest';
 import { parseQuest } from '../parsers/quest-parser';
 import { migrateObjectiveIds } from '../engine/objective-migration';
 import { setObjectiveCompletion } from '../engine/objective-completion';
@@ -67,6 +67,27 @@ export async function setQuestObjectiveCompletion(
 
 		changed = result.changed;
 		return result.content;
+	});
+
+	return changed;
+}
+
+export async function seQuestStatus(
+	app: App,
+	file: TFile,
+	status: QuestStatus,
+): Promise<boolean> {
+	let changed = false;
+
+	await app.fileManager.processFrontMatter(file, (frontmatter) => {
+		if (frontmatter.quest_status === status) return;
+
+		frontmatter.quest_status = status;
+		changed = true;
+
+		if (status === 'completed') {
+			frontmatter.quest_selected = false;
+		}
 	});
 
 	return changed;

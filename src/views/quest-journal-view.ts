@@ -4,6 +4,7 @@ import {
 	loadQuests,
 	migrateQuestObjectiveIds,
 	setQuestObjectiveCompletion,
+	seQuestStatus,
 } from '../services/quest-repository';
 import { Objective } from '../models/objective';
 import {
@@ -53,7 +54,7 @@ export class QuestJournalView extends ItemView {
 	}
 
 	async refresh(): Promise<void> {
-		console.debug('Quest Journal: refresh', performance.now());
+		//console.debug('Quest Journal: refresh', performance.now());
 		this.quests = await loadQuests(this.app);
 
 		if (
@@ -223,6 +224,29 @@ export class QuestJournalView extends ItemView {
 
 			checkbox.checked = isEffectivelyCompleted(objective);
 			checkbox.disabled = false;
+		}
+	}
+
+	private async updateQuestStatus(
+		quest: Quest,
+		status: QuestStatus,
+		selector: HTMLSelectElement,
+	): Promise<void> {
+		if (quest.status === status) return;
+
+		selector.disabled = true;
+
+		try {
+			await seQuestStatus(this.app, quest.file, status);
+		} catch (error) {
+			console.error('Quest Journal: Quest status update failed', error);
+
+			new Notice(
+				'Unable to update quest status. Check the console for details.',
+			);
+
+			selector.value = quest.status;
+			selector.disabled = false;
 		}
 	}
 
@@ -438,9 +462,40 @@ export class QuestJournalView extends ItemView {
 		detail.createEl('h2', { text: selected.title });
 
 		const status = detail.createDiv({ cls: 'quest-detail-status' });
-		status.setText(
-			`Status: ${selected.status}${selected.selected ? ' • Selected' : ''}`,
-		);
+
+		status.createSpan({ text: 'Status: ' });
+
+		const statusSelector = status.createEl('select', {
+			attr: {
+				'aria-label': 'Quest status',
+			},
+		});
+
+		const statusLabels: Record<QuestStatus, string> = {
+			available: 'Available',
+			paused: 'Paused',
+			completed: 'Completed',
+		};
+
+		for (const value of Object.keys(statusLabels) as QuestStatus[]) {
+			statusSelector.createEl('option', {
+				value,
+				text: statusLabels[value],
+			});
+		}
+		statusSelector.value = selected.status;
+
+		statusSelector.addEventListener('change', () => {
+			void this.updateQuestStatus(
+				selected,
+				statusSelector.value as QuestStatus,
+				statusSelector,
+			);
+		});
+
+		if (selected.selected) {
+			status.createSpan({ text: ' • Selected' });
+		}
 
 		this.renderEditNotice(detail, selected);
 

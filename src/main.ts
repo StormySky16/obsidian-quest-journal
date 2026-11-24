@@ -1,4 +1,4 @@
-import { Plugin, TFile } from 'obsidian';
+import { Plugin } from 'obsidian';
 import { QuestJournalView, VIEW_TYPE } from './views/quest-journal-view';
 
 export default class QuestJournalPlugin extends Plugin {
@@ -19,8 +19,8 @@ export default class QuestJournalPlugin extends Plugin {
 		});
 
 		this.registerEvent(
-			this.app.vault.on('modify', (file) => {
-				if (file instanceof TFile && file.path.startsWith('Quests/')) {
+			this.app.metadataCache.on('changed', (file) => {
+				if (file.path.startsWith('Quests/')) {
 					void this.refreshViews();
 				}
 			}),
@@ -28,6 +28,7 @@ export default class QuestJournalPlugin extends Plugin {
 	}
 
 	private async refreshViews(): Promise<void> {
+		//console.debug('Quest Journal: Refreshing views');
 		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE);
 
 		for (const leaf of leaves) {

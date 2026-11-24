@@ -30,10 +30,21 @@ deadline: 2026-12-31
 | --- | --- |
 | `quest_type` | `side` means side quest; all other or missing values become `main`. |
 | `quest_status` | `available`, `paused`, or `completed`; invalid or missing values become `available`. |
-| `quest_selected` | Selected only when the parsed value is the boolean `true`. |
+| `quest_selected` | Selected (prioritised) only when the parsed value is the boolean `true`. |
 | `deadline` | Optional; a truthy value is converted to a string. No date validation occurs in the parser. |
 
-**Legacy compatibility:** `quest_status: selected` produces `status: available` and `selected: true`. Selection is otherwise independent of quest status.
+**Legacy compatibility:** `quest_status: selected` is interpreted as an available, prioritised quest.
+
+### Status and prioritisation
+
+Quest status and prioritisation are independent properties. The `quest_selected` property represents prioritisation,
+not which quest is currently being viewed in the journal.
+
+Any supported quest status may coexist with either value of `quest_selected`, including `quest_status: completed`
+with `quest_selected: true`.
+
+Certain journal operations may update both properties together (see Quest status editing and persistence below).
+These operations do not impose additional validity constraints on the stored frontmatter.
 
 ## 3. Sections
 
@@ -77,7 +88,7 @@ The supported ID comment is a trailing comment of the form:
 - The recognized ID value contains ASCII letters, digits, and hyphens (`[a-zA-Z0-9-]+`).
 - The parser detects malformed `qj:id` markers on recognized objective lines and reports them as parse issues.
 - Missing IDs are permitted for reading, but objective editing requires every recognized objective in the quest to have an ID.
-- Duplicate IDs within a quest block editing. Global uniqueness across files is not currently checked.
+- Duplicate IDs within a quest block objective editing. Global uniqueness across files is not currently checked.
 - Objective ID migration adds missing trailing comments while preserving existing valid IDs. It refuses to commit a partial result if it encounters malformed IDs, duplicates, a source mismatch, or ID-generation failure.
 
 ### Edit readiness
@@ -85,15 +96,29 @@ The supported ID comment is a trailing comment of the form:
 | State | Condition | Behavior |
 | --- | --- | --- |
 | `ready` | No malformed ID issues, no duplicates, no missing IDs | Objective checkboxes may be edited. |
-| `migration-required` | Missing IDs, but no malformed IDs or duplicates | User may initiate ID migration before editing. |
-| `blocked` | Malformed IDs or duplicate IDs | Editing is blocked pending repair. |
+| `migration-required` | Missing IDs, but no malformed IDs or duplicates | User may initiate ID migration before editing objectives. |
+| `blocked` | Malformed IDs or duplicate IDs | Objective editing is blocked pending repair. |
 
 ## 6. Completion semantics
 
-Quest Journal distinguishes between **manual completion**, which is stored in Markdown, and **effective completion**, which is computed by the journal.
+Quest Journal distinguishes between quest-level completion and objective-level completion.
 
-### Manual completion
+At the objective level, **manual completion** is stored in Markdown, while **effective completion** is computed by the journal.
 
+### Quest-level completion
+
+Quest-level completion is represented by `quest_status: completed` and remains independent of objective completion.
+
+- Completing all objectives does not automatically change the quest's status.
+- A quest may be marked as completed while some or all of its objectives remain incomplete.
+- Completing a quest does not modify the completion states of its objectives.
+- Unchecking, adding, removing, or otherwise modifying objectives on a completed quest
+does not automatically reopen it.
+- A completed quest with incomplete objectives is a valid state.
+
+Quest completion and reopening are explicit status changes, rather than states derived from objective completion.
+
+### Manual objective completion
 The Markdown checkbox represents an objective's explicit completion state:
 
 - `[ ]` — Not manually completed.
@@ -153,8 +178,6 @@ The current model does not support explicitly forcing a parent to remain incompl
 
 A future custom checkbox marker could represent this override without requiring automatic completion to be persisted. No such marker is currently implemented.
 
-Quest-level `quest_status: completed` remains independent of objective completion. Completing all objectives does not automatically change the quest's status.
-
 ## 7. Objective editing and persistence
 
 When a user changes an editable objective checkbox, the repository uses Obsidian's `vault.process()` to read and modify the current file content.
@@ -172,7 +195,47 @@ Only explicit/manual completion is written to Markdown. Automatic completion is 
 
 **Line endings:** The parser accepts LF and CRLF. The completion writer splits on either and joins using CRLF if the content contains CRLF, otherwise LF. Mixed line endings are therefore not guaranteed to be preserved exactly.
 
-## 8. Compatibility and known limitations
+## 8. Quest status editing and persistence
+
+When a user changes a quest's status through the journal, the repository uses Obsidian's `fileManager.processFrontMatter()`
+to update the current file's frontmatter.
+
+The status update operation:
+
+1. Checks whether the stored `quest_status` already matches the requested status.
+2. Updates `quest_status` when the values differ.
+3. Sets `quest_selected` to `false` when transitioning into the completed state.
+4. Preserves unrelated property values and Markdown body content.
+
+Status changes and automatic deprioritisation are performed within the same frontmatter update operation.
+
+Assigning the same stored status does not change either property.
+
+**Formatting:** Obsidian handles frontmatter serialisation. The original YAML formatting is not guaranteed to be preserved exactly.
+
+### Automatic deprioritisation
+
+Completing a quest through the journal automatically clears its prioritisation.
+
+Other status transitions preserve existing prioritisation, including reopening a completed quest.
+
+Automatic deprioritisation is a side effect of the journal's completion operation, not a constraint on valid quest state.
+
+### Direct Markdown editing
+
+Direct edits to `quest_status` do not trigger automatic deprioritisation. The journal interprets the resulting frontmatter without rewriting otherwise valid property combinations.
+
+For example, the following combination is valid:
+
+```yaml
+quest_status: completed
+quest_selected: true
+```
+
+The journal provides guided operations for modifying quest state, while Markdown remains the authoritative editable representation of that state.
+
+
+## 9. Compatibility and known limitations
 
 - Markdown remains the authoritative editable representation. Automatically completed objectives may appear checked in the journal while remaining unchecked in the underlying Markdown because effective completion is computed rather than persisted.
 - Custom checkbox markers are not supported by the current parser. Adding them requires coordinated changes to parsing, validation, migration, editing, rendering, and tests.
@@ -180,6 +243,7 @@ Only explicit/manual completion is written to Markdown. Automatic completion is 
 - Duplicate `## Objectives` headings are not merged and should be avoided.
 - A stable quest identifier, cross-quest relationships, and recurring objective semantics are future work, not part of the present file-format contract.
 
-## 9. Maintenance rule
+## 10. Maintenance rule
 
 When changing how Markdown is parsed, validated, migrated, or written, update this document and the corresponding tests in the same change. Keep **implemented** and **planned** behavior explicitly separated.
+
