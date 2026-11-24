@@ -72,7 +72,7 @@ export async function setQuestObjectiveCompletion(
 	return changed;
 }
 
-export async function seQuestStatus(
+export async function setQuestStatus(
 	app: App,
 	file: TFile,
 	status: QuestStatus,

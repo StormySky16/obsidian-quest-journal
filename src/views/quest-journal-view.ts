@@ -4,7 +4,7 @@ import {
 	loadQuests,
 	migrateQuestObjectiveIds,
 	setQuestObjectiveCompletion,
-	seQuestStatus,
+	setQuestStatus,
 } from '../services/quest-repository';
 import { Objective } from '../models/objective';
 import {
@@ -237,7 +237,7 @@ export class QuestJournalView extends ItemView {
 		selector.disabled = true;
 
 		try {
-			await seQuestStatus(this.app, quest.file, status);
+			await setQuestStatus(this.app, quest.file, status);
 		} catch (error) {
 			console.error('Quest Journal: Quest status update failed', error);
 
